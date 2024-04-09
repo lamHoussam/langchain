@@ -216,6 +216,28 @@ class Chain(RunnableSerializable[Dict[str, Any], Dict[str, Any]], ABC):
             final_outputs[RUN_KEY] = RunInfo(run_id=run_manager.run_id)
         return final_outputs
 
+    def stream(
+            self,
+            input,
+            config = None,
+            run_manager= None,
+            **kwargs
+    ):
+        config = ensure_config(config)
+ 
+        inputs = self.prep_inputs(input)
+        return_only_outputs = kwargs.get("return_only_outputs", False)
+        final_output = ""
+        prompts, _ = self.prep_prompts([inputs], run_manager=run_manager)
+        chunk_dict = {}
+        for chunk in self.llm.stream(input=prompts[0], config=config, **kwargs):
+            yield chunk
+            final_output += chunk if isinstance(chunk, str) else str(chunk.content)
+
+        outputs = {"text": final_output, "id": chunk_dict.get("id", None)}
+        self.prep_outputs(inputs, outputs, return_only_outputs)
+
+
     @property
     def _chain_type(self) -> str:
         raise NotImplementedError("Saving not supported for this chain type.")
